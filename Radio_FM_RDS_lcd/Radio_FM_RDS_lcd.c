@@ -1,11 +1,7 @@
 #include <string.h>
-#include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include "Radio_FM_RDS_lcd.h"
-
-char RDS_PS[9] = "        "; // array for RDS Program Service text (max 8 chars + NULL char '\0')
-unsigned short int registers[16]; // 16 x 16-bit device registers
 
 
 /*** BIT OPERATIONS ***/
@@ -22,21 +18,21 @@ void cbit(volatile unsigned char *reg, unsigned char bit) // clear bit in regist
 
 void _sbit(unsigned char pin) // set bit on port C
 {
-  /* if _sbit is replaced in the code below in a few places by sbit(&PORTC, pin) then functionality behaves strange, don't know the reason */
-  PORTC |= (1 << pin);
+  /* if at least one more _sbit is replaced in the code below by sbit(&PORTC, pin) then functionality starts behaving strange, don't know the reason */
+  *_PORTC |= (1 << pin);
 }
 
 void dir_sda(unsigned char dir) // set SDA direction
 {
   if (dir == 0)
-    DDRC &= ~(1 << SDA); // SDA as input
+    cbit(_DDRC, SDA); // SDA as input
   else if (dir == 1)
-    DDRC |= (1 << SDA); // SDA as output
+    sbit(_DDRC, SDA); // SDA as output
 }
 
 unsigned char read_sda() // read bit on SDA
 {
-  unsigned char data = PINC; // read byte
+  unsigned char data = *_PINC; // read byte
   data &= (1 << SDA); // mask on SDA
   return (data != 0) ? 1 : 0;
 }
@@ -45,31 +41,31 @@ unsigned char read_sda() // read bit on SDA
 
 void start() // start bit
 {
-  _sbit(SDA);
-  _sbit(SCL);
-  cbit(&PORTC, SDA);
-  cbit(&PORTC, SCL);
+  sbit(_PORTC, SDA);
+  sbit(_PORTC, SCL);
+  cbit(_PORTC, SDA);
+  cbit(_PORTC, SCL);
 }
 
 void stp() // stop bit
 {
-  cbit(&PORTC, SDA);
-  _sbit(SCL);
-  _sbit(SDA);
+  cbit(_PORTC, SDA);
+  sbit(_PORTC, SCL);
+  sbit(_PORTC, SDA);
 }
 
 void ack() // acknowledgment bit
 {
-  cbit(&PORTC, SDA);
-  _sbit(SCL);
-  cbit(&PORTC, SCL);
+  cbit(_PORTC, SDA);
+  sbit(_PORTC, SCL);
+  cbit(_PORTC, SCL);
 }
 
 void nack() // no acknowledgment bit
 {
-  _sbit(SDA);
-  _sbit(SCL);
-  cbit(&PORTC, SCL);
+  sbit(_PORTC, SDA);
+  sbit(_PORTC, SCL);
+  cbit(_PORTC, SCL);
 }
 
 unsigned char read_byte() // read 8-bits
@@ -84,7 +80,7 @@ unsigned char read_byte() // read 8-bits
       data |= 1;
     if (i < 7)
       data <<= 1;
-    cbit(&PORTC, SCL);
+    cbit(_PORTC, SCL);
   }
   dir_sda(_OUTPUT);
   
@@ -99,20 +95,20 @@ void write_byte(unsigned char data) // write 8-bits
   {
     if ((data & 0x80) == 0)
     {
-      cbit(&PORTC, SDA);
+      cbit(_PORTC, SDA);
     }
     else
     {
       _sbit(SDA);
     }
     _sbit(SCL);
-    cbit(&PORTC, SCL);
+    cbit(_PORTC, SCL);
     data <<= 1;
   }
   
   dir_sda(_INPUT);
   _sbit(SCL);
-  cbit(&PORTC, SCL);
+  cbit(_PORTC, SCL);
   dir_sda(_OUTPUT);
 }
 
@@ -120,41 +116,41 @@ void write_byte(unsigned char data) // write 8-bits
 
 void init_interrupt() // interrupt configuration
 {
-  cbit(&DDRD, INT); // INT as input
-  sbit(&PORTD, INT); // pull-up on INT
-  sbit(&EICRA, ISC11); // falling edge on INT1 generates an interrupt request
-  sbit(&EIMSK, INT1); // external interrupt request 1 enable
-  sbit(&SREG, 7); // enable global interrupts
+  cbit(_DDRD, INT); // INT as input
+  sbit(_PORTD, INT); // pull-up on INT
+  sbit(_EICRA, _ISC11); // falling edge on INT1 generates an interrupt request
+  sbit(_EIMSK, _INT1); // external interrupt request 1 enable
+  sbit(_SREG, 7); // enable global interrupts
 }
 
 void clr_eeprom() // eeprom clean out from 0x08 up to 0x00 addresses
 {
   for (char i = 8; i >= 0; i--)
   {
-    while (EECR & (1 << EEPE)); // wait for completion of previous write
-    EEARH = 0; // eeprom address register (high byte)
-    EEARL = i; // eeprom address register (low byte)
-    EEDR = 0; // eeprom data register
-    sbit(&EECR, EEMPE);
-    sbit(&EECR, EEPE); // start eeprom writing
+    while (*_EECR & (1 << _EEPE)); // wait for completion of previous write
+    *_EEARH = 0; // eeprom address register (high byte)
+    *_EEARL = i; // eeprom address register (low byte)
+    *_EEDR = 0; // eeprom data register
+    sbit(_EECR, _EEMPE);
+    sbit(_EECR, _EEPE); // start eeprom writing
   }
 }
 
 void read_eeprom(unsigned char favourite) // read data from eeprom, address at current favourite
 {
-  while (EECR & (1 << EEPE)); // wait for completion of previous write
-  EEARH = 0; // eeprom address register (high byte)
-  EEARL = favourite - 1; // eeprom address register (low byte)
-  sbit(&EECR, EERE); // start eeprom reading
-  registers[0x03] |= EEDR; // mask on new channel (eeprom data register)
+  while (*_EECR & (1 << _EEPE)); // wait for completion of previous write
+  *_EEARH = 0; // eeprom address register (high byte)
+  *_EEARL = favourite - 1; // eeprom address register (low byte)
+  sbit(_EECR, _EERE); // start eeprom reading
+  registers[0x03] |= *_EEDR; // mask on new channel (eeprom data register)
 }
 
 void write_eeprom() // write data into eeprom, address at current favourite
 {
-  while (EECR & (1 << EEPE)); // wait for completion of previous write
-  EEDR = registers[0x0B] & 0x00FF; // eeprom data register, mask on channel, only 8 bits is sufficient
-  sbit(&EECR, EEMPE);
-  sbit(&EECR, EEPE); // start eeprom writing
+  while (*_EECR & (1 << _EEPE)); // wait for completion of previous write
+  *_EEDR = registers[0x0B] & 0x00FF; // eeprom data register, mask on channel, only 8 bits is sufficient
+  sbit(_EECR, _EEMPE);
+  sbit(_EECR, _EEPE); // start eeprom writing
 }
 
 /*** Si4703 ***/
@@ -202,15 +198,15 @@ void write_registers() // device registers (6) update
 
 void init_radio() // Si4703 initialization
 {
-  sbit(&DDRC, SDA); // SDA as output
-  sbit(&DDRC, SCL); // SCL as output
-  sbit(&DDRD, RST); // RST as output
+  sbit(_DDRC, SDA); // SDA as output
+  sbit(_DDRC, SCL); // SCL as output
+  sbit(_DDRD, RST); // RST as output
 
   _sbit(SCL);
-  cbit(&PORTC, SDA);
-  cbit(&PORTD, RST);
+  cbit(_PORTC, SDA);
+  cbit(_PORTD, RST);
   _delay_ms(1);
-  sbit(&PORTD, RST);
+  sbit(_PORTD, RST);
   _delay_ms(1);
  
   read_registers();
@@ -227,7 +223,7 @@ void init_radio() // Si4703 initialization
 }
 
 void set_channel(unsigned char key) // tune into selected channel / frequency
-{        
+{
   strcpy(RDS_PS, "        "); // Program Service text clean out when favourite station selected
 
   read_registers();
@@ -300,7 +296,7 @@ void set_volume(unsigned char vol)
 
 ISR(INT1_vect) // Interrupt Service Routine from INT1 (RDS Program Service text decode)
 {
-  char c_SREG = SREG; // store Status REGister
+  char c_SREG = *_SREG; // store Status REGister
   unsigned char PS_index; // RDS received char index
   unsigned char rx_char; // RDS received char
   
@@ -318,44 +314,44 @@ ISR(INT1_vect) // Interrupt Service Routine from INT1 (RDS Program Service text 
       rx_char = ' ';    
     RDS_PS[PS_index * 2 + 1] = rx_char;
   }
-  SREG = c_SREG; // restore Status REGister
+  *_SREG = c_SREG; // restore Status REGister
 }
 
 /*** 2x16 LCD DISPLAY (HD44780) ***/
 
 void strobe() // device strobe
 {
-  sbit(&PORTB, EN);
-  cbit(&PORTB, EN);
+  sbit(_PORTB, EN);
+  cbit(_PORTB, EN);
 }
 
-void write_display(unsigned char mode, unsigned char data)
+void write_display(unsigned char mode, unsigned char data) // write instruction or data to display
 {
   if (mode == 0) // instruction register
-    cbit(&PORTB, RS);
+    cbit(_PORTB, RS);
   if (mode == 1) // data register
-    sbit(&PORTB, RS);
+    sbit(_PORTB, RS);
 
-  PORTD &= 0x0F; // clear four upper bits on port D
-  PORTD |= (data & 0xF0); // mask on the upper nibble
+  *_PORTD &= 0x0F; // clear four upper bits on port D
+  *_PORTD |= (data & 0xF0); // mask on the upper nibble
   strobe();
-  PORTD &= 0x0F; // clear four upper bits on port D
-  PORTD |= ((data << 4) & 0xF0); // mask on the lower nibble
+  *_PORTD &= 0x0F; // clear four upper bits on port D
+  *_PORTD |= ((data << 4) & 0xF0); // mask on the lower nibble
   strobe();
 }
 
-void init_display() // LCD initialization
+void init_display() // display initialization
 {
-  sbit(&DDRB, RS); // RS as output
-  sbit(&DDRB, EN); // EN as output
-  DDRD |= 0xF0; // D4...D7 as output
+  sbit(_DDRB, RS); // RS as output
+  sbit(_DDRB, EN); // EN as output
+  *_DDRD |= 0xF0; // D4...D7 as output
   
-  cbit(&PORTB, EN);
-  cbit(&PORTB, RS);
+  cbit(_PORTB, EN);
+  cbit(_PORTB, RS);
   _delay_ms(150);
 
-  PORTD &= 0x0F; // clear four upper bits on port D
-  PORTD |= 0x30;
+  *_PORTD &= 0x0F; // clear four upper bits on port D
+  *_PORTD |= 0x30;
   strobe();
   _delay_ms(5);
 
@@ -374,13 +370,13 @@ void init_display() // LCD initialization
   _delay_ms(1);
 }
 
-void write_char(unsigned char data) // char display
+void write_char(unsigned char data) // display char
 {
   write_display(DATA, data);
   _delay_ms(1);
 }
 
-void write_text(char *text) // text display
+void write_text(char *text) // display text
 {
   unsigned char i = 0;
 
@@ -398,7 +394,7 @@ void display_info() // information display
   read_registers();
 
   write_text("FM:");
-  write_char(EEARL + 1 + 0x30); // favourite nr
+  write_char(*_EEARL + 1 + 0x30); // favourite nr
   
   write_text("   ");
 
