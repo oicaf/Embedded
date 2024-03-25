@@ -33,7 +33,11 @@
 #define STC 14 // Seek/Tune Complete
 #define RDSR 15 // RDS Ready
 
-/*** VARIABLES AND FUNCTIONS DECLARATION ***/
+unsigned char key; // input key on serial monitor
+static unsigned char volume = 1; // volume level (min)
+static char RDS_PS[9] = "        "; // array for RDS Program Service text (max 8 chars + NULL char '\0')
+unsigned short int registers[16]; // 16 x 16-bit device registers
+
 static volatile unsigned char *_DDRB = (volatile unsigned char *)0x24; // Port B Data Direction Register
 static volatile unsigned char *_PORTB = (volatile unsigned char *)0x25; // Port B Data Register
 static volatile unsigned char *_PINC = (volatile unsigned char *)0x26; // Port C Input Pins Address
@@ -49,49 +53,17 @@ static volatile unsigned char *_EEARH = (volatile unsigned char *)0x42; // EEPRO
 static volatile unsigned char *_SREG = (volatile unsigned char *)0x5F; // Status Register
 static volatile unsigned char *_EICRA = (volatile unsigned char *)0x69; // External Interrupt Control Register A
 
-unsigned char key; // input key on serial monitor
-unsigned short int registers[16]; // 16 x 16-bit device registers
-static char RDS_PS[9] = "        "; // array for RDS Program Service text (max 8 chars + NULL char '\0')
-
 #ifdef __cplusplus
  extern "C" {
 #endif
 
-/*** BIT OPERATIONS ***/
-void sbit(volatile unsigned char *reg, unsigned char bit); // set bit in register
-void cbit(volatile unsigned char *reg, unsigned char bit); // clear bit in register
-void _sbit(unsigned char pin); // set bit on port C
-void dir_sda(unsigned char dir); // set SDA direction
-unsigned char read_sda(); // read bit on SDA
-
-/*** I2C (TWI) ***/
-void start(); // start bit
-void stp(); // stop bit
-void ack(); // acknowledgment bit
-void nack(); // no acknowledgment bit
-unsigned char read_byte(); // read 8-bits
-void write_byte(unsigned char data); // write 8-bits
-
-/*** ATmega328 ***/
 void init_interrupt(); // interrupt configuration
 void clr_eeprom(); // eeprom clean out from 0x08 up to 0x00 addresses
-void read_eeprom(unsigned char favourite); // read data from eeprom, address at current favourite
-void write_eeprom(); // write data into eeprom, address at current favourite
-
-/*** Si4703 ***/
-void read_registers(); // read all (16) registers from device
-void write_registers(); // device registers (6) update
 void init_radio(); // Si4703 initialization
 void set_channel(unsigned char key); // tune into selected channel / frequency
 void seek_channel(unsigned char key);
 void set_volume(unsigned char vol);
-
-/*** 2x16 LCD DISPLAY (HD44780) ***/
-void strobe(); // device strobe
-void write_display(unsigned char mode, unsigned char data); // write instruction or data to display
 void init_display(); // display initialization
-void write_char(unsigned char data); // display char
-void write_text(char *text); // display text
 void display_info(); // information display
 
 #ifdef __cplusplus

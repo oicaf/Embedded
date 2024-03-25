@@ -5,8 +5,6 @@ Commands sent via serial monitor.
 
 #include "Radio_FM_RDS_lcd.h"
 
-unsigned char volume = 1; // volume level (min)
-
 int main()
 {
   Serial.begin(9600);

@@ -123,7 +123,7 @@ void init_interrupt() // interrupt configuration
   sbit(_SREG, 7); // enable global interrupts
 }
 
-void clr_eeprom() // eeprom clean out from 0x08 up to 0x00 addresses
+void clr_eeprom() // eeprom clean out from address 0x08 down to 0x00
 {
   for (char i = 8; i >= 0; i--)
   {
