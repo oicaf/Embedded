@@ -23,11 +23,6 @@
 #define _OCIE0A 1 // Timer/Counter0 Output Compare Match A Interrupt Enable
 #define _CS00 0 // Clock Select
 #define _CS01 1 // Clock Select
-#define _PCIE2 2 // Pin Change Interrupt Enable 2
-#define _PCINT20 4 // Pin Change Enable Mask 20
-#define _PCINT21 5 // Pin Change Enable Mask 21
-#define _PCINT22 6 // Pin Change Enable Mask 22
-#define _PCINT23 7 // Pin Change Enable Mask 23
 
 /*** Si4703 REGISTERS ***/
 /* 0x02 */
