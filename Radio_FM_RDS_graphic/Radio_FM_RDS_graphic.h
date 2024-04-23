@@ -84,9 +84,7 @@ static volatile unsigned char *_TCCR0A = (volatile unsigned char *)0x44; // Time
 static volatile unsigned char *_TCCR0B = (volatile unsigned char *)0x45; // Timer/Counter Control Register B
 static volatile unsigned char *_OCR0A = (volatile unsigned char *)0x47; // Output Compare Register A
 static volatile unsigned char *_SREG = (volatile unsigned char *)0x5F; // Status Register
-static volatile unsigned char *_PCICR = (volatile unsigned char *)0x68; // Pin Change Interrupt Control Register
 static volatile unsigned char *_EICRA = (volatile unsigned char *)0x69; // External Interrupt Control Register A
-static volatile unsigned char *_PCMSK2 = (volatile unsigned char *)0x6D; // Pin Change Mask Register 2
 static volatile unsigned char *_TIMSK0 = (volatile unsigned char *)0x6E; // Timer/Counter Interrupt Mask Register
 
 #ifdef __cplusplus
