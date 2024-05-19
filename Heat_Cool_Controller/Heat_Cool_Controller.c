@@ -104,7 +104,7 @@ short int read_temp(const unsigned char *ROM_code) // read temperature from sens
   for (i = 0; i <= 7; i++)
     write_byte(ROM_code[i]); // DS18B20 ROM code
   write_byte(0xBE); // read scratchpad command
-  
+
   low_byte = read_byte(); // LS byte
   high_byte = read_byte(); // MS byte
   temp = high_byte << 8 | low_byte;
@@ -328,8 +328,8 @@ void write_background() // display house picture + default set temperature
 void display_temp(short int temp) // display temperature
 {
   unsigned char sign; // 0 - positive temperature, 1 - negative temperature
+  short int _div = 1000; // divider
   short int _temp;
-  unsigned short int _div = 1000; // divider
 
   if (temp < 0)
   {
