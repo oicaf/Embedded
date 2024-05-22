@@ -5,7 +5,8 @@
 #include "Heat_Cool_Controller.h"
 
 unsigned short int set_temp = 220; // temperature set x 10 (22.0`C as default)
-
+unsigned char set_hyst = 5; // hysteresis set x 10 (0.5`C as default)
+unsigned char mode = 0; // operation mode (0 - normal, 1 - hysteresis setup)
 
 /*** BIT OPERATIONS ***/
 
@@ -223,7 +224,7 @@ void write_text(char *text) // display text
   }
 }
 
-void display_set_temp() // display set temperature
+void display_set_temp() // display the set temperature
 {
   write_char(' ');
   write_char(0x30 + set_temp / 100); // first digit
@@ -232,6 +233,16 @@ void display_set_temp() // display set temperature
   write_char(0x30 + set_temp % 10); // third digit after comma
   write_char('`');
   write_char('C');
+  write_char(' ');
+}
+
+void display_set_hyst() // display the set hysteresis
+{
+  write_char(' ');
+  write_text("H: ");
+  write_char(0x30 + set_hyst / 10); // first digit
+  write_char('.');
+  write_char(0x30 + set_hyst % 10); // second digit after comma
   write_char(' ');
 }
 
@@ -426,9 +437,15 @@ void init_interrupt() // interrupts configuration
 {
   /* INT0 & INT1 setup */
   *_DDRD &= ~((1 << LEFT) | (1 << RIGHT)); // keypad B and D buttons as input
-  *_PORTD |= (1 << LEFT) | (1 << RIGHT); // pull-ups on keypad
+  *_PORTD |= (1 << LEFT) | (1 << RIGHT); // pull-ups on keypad B and D buttons
   *_EICRA |= (1 << _ISC11) | (1 << _ISC01); // falling edge on INT0 and INT1 generates an interrupt request
   *_EIMSK |= (1 << _INT1) | (1 << _INT0); // external interrupt request 0 and 1 enable
+
+  /* PCINT21 setup */
+  cbit(_DDRD, HYST); // keypad E button as input
+  sbit(_PORTD, HYST); // pull-up on keypad E button
+  sbit(_PCICR, _PCIE2); // any change on any enabled PCINT[23:16] pin will cause an interrupt
+  sbit(_PCMSK2, _PCINT21); // any change on enabled PCINT21 pin will cause an interrupt
 
   sbit(_SREG, 7); // enable global interrupts
 }
@@ -437,23 +454,33 @@ ISR(INT0_vect) // Interrupt Service Routine from INT0 (B button)
 {
   char c_SREG = *_SREG; // store Status REGister
 
-  set_temp += 5; // increase set temperature by 0.5`C
-  if (set_temp > 390)
-    set_temp = 390;
-
   write_display(INST, 0x9A); // move cursor to line 4
   _delay_us(72);
-  display_set_temp();
-  
+
+  if (mode == 1) // hysteresis setup otherwise normal operation
+  {
+    set_hyst += 5; // increase the set hysteresis by 0.5`C
+    if (set_hyst > 10)
+      set_hyst = 10;    
+    display_set_hyst();
+  }
+  else
+  {
+    set_temp += 5; // increase the set temperature by 0.5`C
+    if (set_temp > 390)
+      set_temp = 390;
+    display_set_temp();
+  }
+
   write_char(' '); // symbol indicating...
   write_char(' '); // ...button pressed  
   _delay_ms(300);
-  
   write_display(INST, 0x9E);
   _delay_us(72);
   write_char(0x1E); // symbol indicating...
   write_char(' '); // ...button released
-  
+
+  _delay_ms(500);
   *_SREG = c_SREG; // restore Status REGister
 }
 
@@ -461,22 +488,54 @@ ISR(INT1_vect) // Interrupt Service Routine from INT1 (D button)
 {
   char c_SREG = *_SREG; // store Status REGister
 
-  set_temp -= 5; // decrease set temperature by 0.5`C
-  if (set_temp < 100)
-    set_temp = 100;
-  
   write_display(INST, 0x99); // move cursor to line 4
   _delay_us(72);
   write_char(' '); // symbol indicating...
   write_char(' '); // ...button pressed
+
+  if (mode == 1)
+  {
+    set_hyst -= 5; // decrease the set hysteresis by 0.5`C
+    if (set_hyst < 5)
+      set_hyst = 5;
+    display_set_hyst();
+  }
+  else
+  {
+    set_temp -= 5; // decrease the set temperature by 0.5`C
+    if (set_temp < 100)
+      set_temp = 100;
+    display_set_temp();
+  }
+
   _delay_ms(300);
-  
-  display_set_temp();
   write_display(INST, 0x99);
   _delay_us(72);
   write_char(' '); // symbol indicating...
   write_char(0x1F); // ...button released
-  
+
+  _delay_ms(500);
+  *_SREG = c_SREG; // restore Status REGister
+}
+
+ISR(PCINT2_vect) // Interrupt Service Routine from PCINT21 (E button)
+{
+  char c_SREG = *_SREG; // store Status REGister
+
+  if (!rbit(_PIND, HYST)) // button pressed otherwise released
+  {
+    write_display(INST, 0x9A); // move cursor to line 4
+    _delay_us(72);
+
+    mode ^= 1;
+    if (mode == 1) // hysteresis setup otherwise normal operation
+      display_set_hyst();
+    else
+      display_set_temp();
+
+    _delay_ms(800);
+  }
+
   *_SREG = c_SREG; // restore Status REGister
 }
 
@@ -528,7 +587,7 @@ unsigned char regulator(unsigned char mode, short int temp) // hysteresis based 
     temp_diff = set_temp - temp;
     switch (mode)
     {
-      case 0: if (abs(temp_diff) >= 5)
+      case 0: if (abs(temp_diff) >= set_hyst)
               {
                 if (temp_diff > 0)
                   mode = 1; // activate heating mode
